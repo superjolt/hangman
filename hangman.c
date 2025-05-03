@@ -86,13 +86,24 @@ void filter_words(char possible[][WORD_LEN], int *count) {
 // Pick the highest-frequency unguessed letter
 char get_best_guess(char possible[][WORD_LEN], int count) {
     int freq[26] = {0};
+
     for (int i = 0; i < count; i++) {
         for (int j = 0; j < 5; j++) {
             char c = possible[i][j];
-            if (c >= 'a' && c <= 'z' && !is_guessed(c))
+            if (c >= 'a' && c <= 'z') {
                 freq[c - 'a']++;
+            }
         }
     }
+
+    // force skip already guessed letters
+    for (int i = 0; i < guessed_count; i++) {
+        char g = guessed[i];
+        if (g >= 'a' && g <= 'z') {
+            freq[g - 'a'] = 0;
+        }
+    }
+
     int best_i = -1, best_f = -1;
     for (int i = 0; i < 26; i++) {
         if (freq[i] > best_f) {
@@ -100,8 +111,10 @@ char get_best_guess(char possible[][WORD_LEN], int count) {
             best_i = i;
         }
     }
-    return best_i >= 0 ? 'a' + best_i : '?';
+
+    return best_i >= 0 ? 'a' + best_i : '!';
 }
+
 
 int main() {
     // allocate candidate list on heap
@@ -126,6 +139,20 @@ int main() {
         free(possible);
         return 1;
     }
+    
+    int found = 0;
+    for (int i = 0; i < word_count; i++) {
+        if (strcmp(secret, all_words[i]) == 0) {
+            found = 1;
+            break;
+        }
+    }
+    if (!found) {
+        printf("Error: The word '%s' is not in the AI's dictionary!\n", secret);
+        free(possible);
+        return 1;
+    }
+
 
     while (!is_win() && !is_loss()) {
         // build candidate list
@@ -135,8 +162,15 @@ int main() {
 
         // AI guess
         char guess = get_best_guess(possible, possible_count);
-        printf("\nAI guesses: %c\n", guess);
+
+        // Skip if already guessed or invalid
+        if (guess == '?' || is_guessed(guess)) {
+            printf("AI has no new letters to guess. Giving up.\n");
+            break;
+        }
+
         guessed[guessed_count++] = guess;
+
 
         // update
         if (strchr(secret, guess))
